@@ -41,7 +41,7 @@ tracking.example.net
 3. Run the DNS server with:
 
    \`\`\`bash
-   python server.py
+   sudo python3 server.py
    \`\`\`
 
 4. The DNS server will start on the local IP address of the machine on port 53 by default.
