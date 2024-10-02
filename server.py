@@ -130,7 +130,7 @@ def get_local_ip():
 def start_dns_server(host='192.168.2.22', port=53):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((host, port))
-    print(f'DNS server started on {host}:{port}')
+    print(f'DNS server started on {host}:{port}. Bomba.')
 
     while True:
         try: 
