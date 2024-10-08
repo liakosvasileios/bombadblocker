@@ -4,6 +4,10 @@ import threading
 import requests
 from dnslib import DNSRecord, QTYPE, RR, A
 import time
+import concurrent.futures
+
+
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=100)
 
 # Blocked domains will be loaded from the file
 BLOCKED_DOMAINS = set()
@@ -97,8 +101,23 @@ def handle_dns_request(data, client_addr, sock):
             return
         except ValueError as e:
             print(f"Error serving {qname} from cache: {e}")
-            # Handle the error (optional): Could send a different response or log
             return 
+
+    print(f'Forwarding {qname} to DoH server')
+    upstream_response = query_doh_server(data)
+
+    if upstream_response:
+        upstream_dns_response = DNSRecord.parse(upstream_response)
+        if upstream_dns_response.rr:
+            answer = upstream_dns_response.rr[0].rdata
+            print(f'Caching response: {qname} -> {answer}')
+            cache_response(qname, str(answer))
+        # Send the response to the original client
+        sock.sendto(upstream_response, client_addr)
+    else:
+        print(f"Failed to get upstream response for {qname}, sending error response")
+        # Optionally send an error response or simply ignore
+
 
     print(f'Forwarding {qname} to DoH server')
     upstream_response = query_doh_server(data)
@@ -127,7 +146,7 @@ def get_local_ip():
         return '127.0.0.1'  # Default to localhost if there's an error
 
 
-def start_dns_server(host=get_local_ip(), port=53):
+def start_dns_server(host, port=53):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((host, port))
     print(f'DNS server started on {host}:{port}. Bomba.')
@@ -135,11 +154,12 @@ def start_dns_server(host=get_local_ip(), port=53):
     while True:
         try: 
             data, client_addr = sock.recvfrom(512)
-            threading.Thread(target=handle_dns_request, args=(data, client_addr, sock)).start()
+            executor.submit(handle_dns_request, data, client_addr, sock)
         except Exception as e:
             print(f'Error handling DNS request: {e}')
 
 
 if __name__ == '__main__':
+    host_addr = get_local_ip()
     load_blocked_domains()
-    start_dns_server()
+    start_dns_server(host_addr)
