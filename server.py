@@ -127,7 +127,7 @@ def get_local_ip():
         return '127.0.0.1'  # Default to localhost if there's an error
 
 
-def start_dns_server(host='192.168.2.22', port=53):
+def start_dns_server(host=get_local_ip(), port=53):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((host, port))
     print(f'DNS server started on {host}:{port}. Bomba.')
