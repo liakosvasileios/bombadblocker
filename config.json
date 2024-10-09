@@ -1,0 +1,9 @@
+{
+    "max_workers": 100,
+    "blocked_domains_file": "blocked_list.txt",
+    "cache_ttl": 60,
+    "doh_servers": [
+        "https://cloudflare-dns.com/dns-query",
+        "https://dns.google/dns-query"
+    ]
+}
