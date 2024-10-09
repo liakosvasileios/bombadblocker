@@ -39,20 +39,6 @@ tracking.example.net
 
 You can configure various settings for the DNS server using the `config.json` file. If the file is missing or empty, default values will be used.
 
-Example `config.json`:
-
-\`\`\`json
-{
-  "max_workers": 100,
-  "cache_ttl": 60,
-  "blocked_domains_file": "blocked_list.txt",
-  "doh_servers": [
-    "https://cloudflare-dns.com/dns-query",
-    "https://dns.google/dns-query"
-  ]
-}
-\`\`\`
-
 - **max_workers**: The maximum number of threads for handling DNS requests.
 - **cache_ttl**: Time-to-live (in seconds) for cached DNS responses.
 - **blocked_domains_file**: Path to the file containing the list of blocked domains.
