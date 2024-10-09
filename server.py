@@ -8,9 +8,6 @@ import concurrent.futures
 from datetime import datetime
 import json
 
-# COMMIT CHANGES: ADDED TIMESTAMPS ON LOGS 
-# COMMIT CHANGES: ADDED A CONFIG FILE
-# ADDED GOOGLE'S DOH SERVER
 
 # Load config from JSON file
 def load_config(config_file='config.json'):
