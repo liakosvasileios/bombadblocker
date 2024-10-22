@@ -7,5 +7,6 @@
         "https://dns.google/dns-query"
     ],
     "rate_limit": 10,
-    "time_window": 60
+    "time_window": 60,
+    "trusted_domains_file": "trusted_list.txt"
 }
