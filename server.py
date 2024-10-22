@@ -1,13 +1,13 @@
 import base64
 import socket
-import threading
 import requests
 from dnslib import DNSRecord, QTYPE, RR, A
 import time
 import concurrent.futures
 from datetime import datetime
 import json
-
+from rapidfuzz import fuzz
+from collections import defaultdict
 
 # Load config from JSON file
 def load_config(config_file='config.json'):
@@ -30,8 +30,13 @@ config = load_config()
 
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=config.get('max_workers', 100))
 
+# Dictionary to track requests (client_ip -> (request_count, first_request_time))
+request_counts = defaultdict(lambda: [0, time.time()])
+
 # Blocked domains will be loaded from the file
 BLOCKED_DOMAINS = set()
+# Trusted domains will be loaded from the file
+TRUSTED_DOMAINS = set()
 
 def load_blocked_domains(file_path=config.get('blocked_domains_file', 'blocked_list.txt')):
     try:
@@ -43,6 +48,19 @@ def load_blocked_domains(file_path=config.get('blocked_domains_file', 'blocked_l
         print(f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Loaded {len(BLOCKED_DOMAINS)} blocked domains.")
     except FileNotFoundError:
         print(f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Blocklist file '{file_path}' not found. No domains are blocked.")
+
+
+
+def load_trusted_domains(file_path=config.get('trusted_domains_file', 'trusted_list.txt')):
+    try:
+        with open(file_path, 'r') as file:
+            for line in file:
+                domain = line.strip()
+                if domain:
+                    TRUSTED_DOMAINS.add(domain)
+        print(f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Loaded {len(TRUSTED_DOMAINS)} trusted domains.")
+    except FileNotFoundError:
+        print(f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Trusted domains list file '{file_path}' not found. Ignoring...")
 
 
 # Cache dictionary (domain -> IP, expiration_time)
@@ -108,8 +126,19 @@ def query_doh_server(request_data):
 
 
 def handle_dns_request(data, client_addr, sock):
+    # Check rate limiting
+    if is_rate_limited(client_addr[0]):
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Rate limit exceeded for {client_addr[0]}.")
+        # Respond with a custom message or DNS error
+        reply = DNSRecord.answer()  # This can be a custom error response
+        sock.sendto(reply.pack(), client_addr)
+        return
+
     request = DNSRecord.parse(data)
     qname = str(request.q.qname).strip('.')
+
+    # LOGGING
+    log_dns_query(qname, client_addr[0])
 
     print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Received DNS request for: {qname}')
 
@@ -173,6 +202,60 @@ def get_local_ip():
     except Exception as e:
         print(f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Error retrieving local IP: {e}")
         return '127.0.0.1'  # Default to localhost if there's an error
+
+
+def is_phishing_domain(domain, trusted_domains=None):
+    if trusted_domains is None:
+        trusted_domains = TRUSTED_DOMAINS
+
+    # Convert domain to lowercase for case-insensitive comparison
+    domain = domain.lower()
+
+    for trusted in trusted_domains:
+        # Check for exact match first to avoid unnecessary computation
+        if domain == trusted.lower():
+            return False  # Domain is trusted, no phishing detected
+
+        # Use fuzz ratio to detect phishing-like domains
+        similarity = fuzz.ratio(domain, trusted.lower())
+        if similarity > 80:  # Set a threshold for phishing detection
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Detected potential phishing domain: {domain}")
+            return True
+
+    return False
+
+
+def log_dns_query(domain, client_ip, log_file='dns_queries.log'):
+    log_entry = {
+        "domain": domain,
+        "client_ip": client_ip,
+        "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    try:
+        with open(log_file, 'a') as logfile:
+            logfile.write(json.dumps(log_entry) + "\n")
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Logged DNS query: {domain} from {client_ip}")
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Failed to log DNS query: {e}")
+
+
+def is_rate_limited(client_ip):
+    current_time = time.time()
+    request_count, first_request_time = request_counts[client_ip]
+
+    # Check if the time window has expired
+    if current_time - first_request_time > config.get('time_window'):
+        # Reset the count and time
+        request_counts[client_ip] = [1, current_time]
+        return False  # Not rate limited
+    else:
+        # Within the time window
+        if request_count < config.get('rate_limit'):
+            # Increment the count
+            request_counts[client_ip][0] += 1
+            return False  # Not rate limited
+        else:
+            return True  # Rate limited
 
 
 def start_dns_server(host, port=53):

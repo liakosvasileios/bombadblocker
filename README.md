@@ -10,6 +10,8 @@ This project is a DNS server that supports DNS-over-HTTPS (DoH) for secure DNS r
 - **Caching:** Resolved IP addresses are cached to speed up responses to repeated queries. Cache entries are valid for a configurable time-to-live (TTL).
 - **Multithreading:** DNS requests are handled in separate threads, allowing the server to process multiple queries concurrently.
 - **Configurable Settings:** Includes a `config.json` file where you can specify various settings like cache TTL, the number of workers, and DoH servers.
+- **Anti-Phising:** Using fuzzing in order to use heuristics to find URLS that are similar to trusted domains.
+- **Rate Limiting:** The server implements rate limiting to prevent abuse, allowing a configurable number of requests per client IP address.
 
 ## Installation and Setup
 
@@ -19,7 +21,7 @@ This project is a DNS server that supports DNS-over-HTTPS (DoH) for secure DNS r
 - Required libraries: Install them using the following command:
 
   \`\`\`bash
-  pip install dnslib requests
+  pip install dnslib requests rapidfuzz
   \`\`\`
 
 ### Blocklist Configuration
@@ -43,6 +45,8 @@ You can configure various settings for the DNS server using the `config.json` fi
 - **cache_ttl**: Time-to-live (in seconds) for cached DNS responses.
 - **blocked_domains_file**: Path to the file containing the list of blocked domains.
 - **doh_servers**: List of DoH servers that the server can randomly select for resolving DNS queries.
+- **rate_limit**: Maximum number of requests allowed per client IP in the specified time window.
+- **time_window**: The time window (in seconds) for rate limiting.
 
 ### Usage
 
@@ -72,18 +76,16 @@ You can configure various settings for the DNS server using the `config.json` fi
 ## Code Structure
 
 - `load_blocked_domains(file_path)`: Loads the blocked domains from a text file.
+- `load_trusted_domains(file_path)`: Loads the trusted domains from a text file.
 - `is_blocked(domain)`: Checks if a domain is in the blocklist.
 - `resolve_from_cache(domain)`: Checks if a domain's IP address is cached.
 - `cache_response(domain, ip)`: Caches the response for a domain.
 - `query_doh_server(request_data)`: Sends the DNS query to a DoH server and returns the response.
 - `handle_dns_request(data, client_addr, sock)`: Processes incoming DNS requests, checks the blocklist and cache, and forwards the request to a DoH server if necessary.
 - `start_dns_server(host, port)`: Starts the DNS server on the specified host and port.
-
-## New Features
-
-- **Timestamps**: Logs now include timestamps to track events more accurately.
-- **Configurable DoH Servers**: The server can now use multiple DoH servers (Cloudflare and Google by default). These are randomly selected for each query.
-- **Error Handling**: The server handles empty or missing configuration files and provides appropriate error messages.
+- `log_dns_query(domain, client_ip, log_file)`: Logs DNS queries to a file.
+- `is_rate_limited(client_ip)`: Checks if a client IP has exceeded the rate limit.
+- `start_dns_server(host, port)`: Starts the DNS server on the specified host and port.
 
 ## Troubleshooting
 

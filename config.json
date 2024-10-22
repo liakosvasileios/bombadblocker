@@ -5,5 +5,7 @@
     "doh_servers": [
         "https://cloudflare-dns.com/dns-query",
         "https://dns.google/dns-query"
-    ]
+    ],
+    "rate_limit": 10,
+    "time_window": 60
 }
